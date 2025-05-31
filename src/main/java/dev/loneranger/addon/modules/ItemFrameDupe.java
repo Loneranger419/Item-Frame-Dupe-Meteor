@@ -3,6 +3,7 @@ package dev.loneranger.addon.modules;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.systems.modules.Categories;
 import meteordevelopment.meteorclient.events.world.TickEvent;
+import meteordevelopment.meteorclient.settings.*;
 import meteordevelopment.orbit.EventHandler;
 import net.minecraft.entity.decoration.ItemFrameEntity;
 import net.minecraft.item.Item;
@@ -15,6 +16,27 @@ import net.minecraft.util.math.Vec3d;
 import net.minecraft.entity.Entity;
 
 public class ItemFrameDupe extends Module {
+    private int tickCounter = 0;
+    private final SettingGroup sgGeneral = settings.getDefaultGroup();
+
+    private final Setting<Integer> delayTicks = sgGeneral.add(new IntSetting.Builder()
+        .name("delay-ticks")
+        .description("Ticks to wait between dupe cycles.")
+        .defaultValue(4)
+        .min(1)
+        .sliderMax(20)
+        .build()
+    );
+
+    private final Setting<Double> reachDistance = sgGeneral.add(new DoubleSetting.Builder()
+        .name("reach-distance")
+        .description("Reach distance to detect item frames.")
+        .defaultValue(4.5)
+        .min(1.0)
+        .sliderMax(6.0)
+        .build()
+    );
+
     public ItemFrameDupe() {
         super(Categories.Misc, "Item Frame Dupe", "Loops shulker in/out of item frames.");
     }
@@ -22,8 +44,10 @@ public class ItemFrameDupe extends Module {
     @EventHandler
     private void onTick(TickEvent.Pre event) {
         if (mc.player == null || mc.world == null) return;
+        if (++tickCounter < delayTicks.get()) return;
+        tickCounter = 0;
 
-        double reach = 4.5;
+        double reach = reachDistance.get();
         Vec3d cameraPos = mc.player.getCameraPosVec(1.0F);
         Vec3d rotation = mc.player.getRotationVec(1.0F);
         Vec3d end = cameraPos.add(rotation.multiply(reach));
@@ -45,24 +69,21 @@ public class ItemFrameDupe extends Module {
         }
 
         if (targetFrame != null) {
-            // Found an item frame, place shulker and pop it
             int shulkerSlot = findShulkerInHotbar();
             if (shulkerSlot != -1) {
                 int prevSlot = mc.player.getInventory().getSelectedSlot();
                 mc.player.getInventory().setSelectedSlot(shulkerSlot);
 
-                mc.interactionManager.interactEntity(mc.player, targetFrame, Hand.MAIN_HAND); // right-click to insert
+                mc.interactionManager.interactEntity(mc.player, targetFrame, Hand.MAIN_HAND);
 
-                // Only pop if item frame now holds a shulker box
                 if (targetFrame.getHeldItemStack().getItem().toString().contains("shulker_box")) {
-                    mc.interactionManager.attackEntity(mc.player, targetFrame);  // left-click to pop
+                    mc.interactionManager.attackEntity(mc.player, targetFrame);
                     mc.player.swingHand(Hand.MAIN_HAND);
                 }
 
                 mc.player.getInventory().setSelectedSlot(prevSlot);
             }
         } else {
-            // No item frame in view, try placing one
             int itemFrameSlot = findItemInHotbar(Items.ITEM_FRAME);
             if (itemFrameSlot != -1) {
                 int prevSlot = mc.player.getInventory().getSelectedSlot();
